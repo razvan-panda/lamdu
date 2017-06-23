@@ -4,7 +4,7 @@ module Lamdu.Sugar.Convert.Hole
 
       -- Used by Convert.GetVar:
     , injectVar
-      -- Used by Convert.Apply(wrapper hole):
+      -- Used by Convert.Hole.Wrapper:
     , convertCommon
     , mkHoleOption, mkHoleOptionFromInjected, addSuggestedOptions
     , BaseExpr(..)

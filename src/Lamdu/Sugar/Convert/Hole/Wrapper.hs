@@ -53,22 +53,24 @@ mkAppliedHoleOptions sugarContext argI argS exprPl stored =
 
 mkAppliedHoleSuggesteds ::
     Monad m =>
-    ConvertM.Context m ->
     Val (Input.Payload m a) ->
     Input.Payload m a ->
     ExprIRef.ValIProperty m ->
-    T m [HoleOption UUID m]
-mkAppliedHoleSuggesteds sugarContext argI exprPl stored =
-    Suggest.valueConversion Load.nominal Nothing (argI <&> onPl)
-    <&> (`runStateT` (sugarContext ^. ConvertM.scInferContext))
-    <&> Lens.mapped %~ onSuggestion
+    ConvertM m [HoleOption UUID m]
+mkAppliedHoleSuggesteds argI exprPl stored =
+    do
+        context <- ConvertM.readContext
+        let onSuggestion (sugg, newInferCtx) =
+                ConvertHole.mkHoleOptionFromInjected
+                (sugarContext & ConvertM.scInferContext .~ newInferCtx)
+                exprPl stored
+                (sugg <&> _1 %~ (^. Infer.plType))
+        Suggest.valueConversion Load.nominal Nothing (argI <&> onPl)
+            <&> (`runStateT` context ^. ConvertM.scInferContext)
+            <&> Lens.mapped %~ onSuggestion
+            & transaction
     where
         onPl pl = (pl ^. Input.inferred, Just pl)
-        onSuggestion (sugg, newInferCtx) =
-            ConvertHole.mkHoleOptionFromInjected
-            (sugarContext & ConvertM.scInferContext .~ newInferCtx)
-            exprPl stored
-            (sugg <&> _1 %~ (^. Infer.plType))
 
 orderedInnerHoles :: Val a -> [Val a]
 orderedInnerHoles e =
@@ -126,22 +128,20 @@ convertAppliedHole (V.Apply funcI argI) argS exprPl =
                       else UnwrapTypeMismatch
                 }
         do
-            sugarContext <- ConvertM.readContext
             hole <- ConvertHole.convertCommon (Just argI) exprPl
-            suggesteds <-
-                mkAppliedHoleSuggesteds sugarContext
-                argI exprPl (exprPl ^. Input.stored)
-                & transaction
+            suggesteds <- mkAppliedHoleSuggesteds argI exprPl (exprPl ^. Input.stored)
+            let appliedOptions =
+                    mkAppliedHoleOptions sugarContext
+                    argI (argS <&> (^. pUserData)) exprPl (exprPl ^. Input.stored)
             hole
-                & rBody . _BodyHole . holeActions . holeOptions . Lens.mapped
-                    %~  ConvertHole.addSuggestedOptions suggesteds
-                    .   mappend (mkAppliedHoleOptions sugarContext
-                        argI (argS <&> (^. pUserData)) exprPl (exprPl ^. Input.stored))
+                & options %~ mappend appliedOptions
+                & options %~ ConvertHole.addSuggestedOptions suggesteds
                 & return
             & lift
             <&> rBody . _BodyHole . holeMArg .~ Just holeArg
             <&> rPayload . plData . pUserData <>~ funcI ^. Val.payload . Input.userData
             <&> rPayload . plActions . wrap .~ WrapperAlready storedEntityId
     where
+        options = rBody . _BodyHole . holeActions . holeOptions . Lens.mapped
         storedEntityId = exprPl ^. Input.stored & Property.value & uuidEntityId
         uuidEntityId valI = (UniqueId.toUUID valI, EntityId.ofValI valI)
