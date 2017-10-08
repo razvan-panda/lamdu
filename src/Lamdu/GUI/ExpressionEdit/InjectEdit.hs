@@ -88,7 +88,7 @@ make (Sugar.Inject tag mVal) pl =
                 Options.disambiguationNone
                 (tag & Sugar.tagInfo . Sugar.tagInstance .~ (pl ^. Sugar.plEntityId))
                 Nothing (pl ^. Sugar.plData . ExprGuiT.plNearestHoles) dot []
-        & ExpressionGui.stdWrap pl
+        & ExpressionGui.stdWrap "InjectEdit" pl
     Just val ->
         do
             disamb <-
@@ -99,7 +99,7 @@ make (Sugar.Inject tag mVal) pl =
                 ExprGuiM.makeSubexpression val <&> (:[])
             colon <- injectIndicator ":"
             makeCommon disamb tag replaceParent (ExprGuiT.nextHolesBefore val) colon arg
-        & ExpressionGui.stdWrapParentExpr pl tagInstance
+        & ExpressionGui.stdWrapParentExpr "InjectEdit" pl tagInstance
         where
             mParensId
                 | pl ^. Sugar.plData . ExprGuiT.plNeedParens =

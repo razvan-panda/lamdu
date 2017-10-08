@@ -232,6 +232,6 @@ make getVar pl =
         makeParamsRecord myId paramsRecordVar
     Sugar.GetParam param ->
         makeGetParam param myId <&> Responsive.fromWithTextPos
-    & ExpressionGui.stdWrap pl
+    & ExpressionGui.stdWrap "GetVarEdit" pl
     where
         myId = WidgetIds.fromExprPayload pl

@@ -254,8 +254,10 @@ makeHoleResultWidget holeInfo resultId holeResult =
                 <&> pickBefore
         isSelected <- Widget.isSubCursor ?? resultId
         when isSelected (ExprGuiM.setResultPicker (pickBefore (pure mempty)))
+        trace "Making hole result widget" $ return ()
         holeResultConverted
             & postProcessSugar holeInfo
+            & traceId "PostProcessed "
             & ExprGuiM.makeSubexpression
             <&> Widget.enterResultCursor .~ resultId
             <&> E.eventMap %~ removeUnwanted config
@@ -292,7 +294,7 @@ makeHoleResultWidget holeInfo resultId holeResult =
 postProcessSugar :: HoleInfo f -> ExpressionN m () -> ExpressionN m ExprGuiT.Payload
 postProcessSugar info expr =
     expr
-    & AddParens.addWith (hiMinOpPrec info)
+    & AddParens.addWith (traceId "minOpPrec in hole result: " $ hiMinOpPrec info)
     <&> pl
     & SugarLens.holeArgs . Sugar.plData . ExprGuiT.plShowAnnotation
     .~ ExprGuiT.alwaysShowAnnotations
@@ -303,7 +305,7 @@ postProcessSugar info expr =
             , ExprGuiT._plNearestHoles = NearestHoles.none
             , ExprGuiT._plShowAnnotation = ExprGuiT.neverShowAnnotations
             , ExprGuiT._plNeedParens = needParens == AddParens.NeedsParens
-            , ExprGuiT._plMinOpPrec = minOpPrec
+            , ExprGuiT._plMinOpPrec = traceId "postProcessSugar puts into PL of result: " minOpPrec
             }
 
 emptyPickEventMap ::

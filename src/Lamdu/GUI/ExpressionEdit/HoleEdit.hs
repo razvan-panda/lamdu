@@ -38,7 +38,7 @@ makeWrapper ::
 makeWrapper pl openHoleId holeArg =
     do
         (wrapper, holePicker) <- Wrapper.make openHoleId holeArg & ExprGuiM.listenResultPicker
-        exprEventMap <- ExprEventMap.make pl holePicker
+        exprEventMap <- ExprEventMap.make "HoleEdit.makeWrapper" pl holePicker
         E.weakerEvents exprEventMap wrapper & return
 
 assignHoleCursor ::

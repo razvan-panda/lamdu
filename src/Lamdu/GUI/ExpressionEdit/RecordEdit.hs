@@ -72,7 +72,7 @@ make record@(Sugar.Composite fields recordTail addField) pl =
                 & ExprGuiM.withHolePicker resultPicker
         (if addBg then ExpressionGui.addValFrame else return id)
             ?? E.weakerEvents addFieldEventMap gui
-    & ExpressionGui.stdWrapParentExpr pl (destCursorId fields (pl ^. Sugar.plEntityId))
+    & ExpressionGui.stdWrapParentExpr "RecordEdit" pl (destCursorId fields (pl ^. Sugar.plEntityId))
     where
         myId = WidgetIds.fromExprPayload pl
         addBg = shouldAddBg record

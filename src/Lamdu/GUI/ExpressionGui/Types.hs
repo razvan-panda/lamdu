@@ -73,7 +73,7 @@ data Payload = Payload
     , _plShowAnnotation :: ShowAnnotation
     , _plNeedParens :: Bool
     , _plMinOpPrec :: Int
-    }
+    } deriving Show
 Lens.makeLenses ''Payload
 
 isHoleResult :: Sugar.Payload f Payload -> Bool

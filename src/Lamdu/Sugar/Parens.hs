@@ -87,7 +87,9 @@ precedenceOfLabeledApply apply@(LabeledApply func specialArgs annotatedArgs rela
             appendOpPrec
                 | notBoxed = prec+1
                 | otherwise = 0
-            prec = func ^. binderName & precedence
+            prec =
+                func ^. binderName & precedence
+                & traceId ("prec of " ++ show (func ^. binderName) ++ " ")
     Object arg | notBoxed ->
         ( ParenIf (IfGreater 13) (IfGreaterOrEqual 13)
         , LabeledApply func (Object (arg (Just 13) (Precedence (Just 13) Nothing)))
@@ -117,7 +119,7 @@ precedenceOf =
     BodyInjectedExpression -> (NeverParen, BodyInjectedExpression)
     BodyLiteral x          -> (NeverParen, BodyLiteral x)
     BodyGetVar x           -> (NeverParen, BodyGetVar x)
-    BodyHole x             -> mkUnambiguous BodyHole x
+    BodyHole x             -> (NeverParen, x ?? Just 27 ?? unambiguous & BodyHole)
     BodyRecord x           -> mkUnambiguous BodyRecord x
     BodyCase x             -> mkUnambiguous BodyCase x
     BodyLam x              ->
@@ -163,8 +165,10 @@ loop minOpPrec parentPrec (Expression body pl) =
     Expression finalBody (pl & plData %~ (,,) minOpPrec needsParens)
     where
         f expr minOpPrecOverride override newParentPrec =
-            loop (fromMaybe minOpPrec minOpPrecOverride)
+            loop (traceId msg $ fromMaybe minOpPrec minOpPrecOverride)
             (fromMaybe <$> newParentPrec <*> override) expr
+            where
+                msg = show (void body) ++ " has minOpPrecOverride: " ++ show minOpPrecOverride ++ " so gets minOpPrec="
         Precedence parentBefore parentAfter = parentPrec
         needsParens
             | haveParens = NeedsParens

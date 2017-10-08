@@ -118,4 +118,4 @@ make lit pl =
     Sugar.LiteralNum x -> genericEdit Style.styleNum x pl
     Sugar.LiteralBytes x -> genericEdit Style.styleBytes x pl
     Sugar.LiteralText x -> textEdit x pl <&> Responsive.fromWithTextPos
-    & ExpressionGui.stdWrap pl
+    & ExpressionGui.stdWrap "LiteralEdit" pl

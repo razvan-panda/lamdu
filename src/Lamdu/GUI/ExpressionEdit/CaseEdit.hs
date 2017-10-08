@@ -116,7 +116,7 @@ make (Sugar.Case mArg (Sugar.Composite alts caseTail addAlt)) pl =
             <*> (Responsive.vboxSpaced ?? [header, altsGui])
             <&> E.weakerEvents addAltEventMap
     & Widget.assignCursor myId headerId
-    & ExpressionGui.stdWrapParentExpr pl (destCursorId alts (pl ^. Sugar.plEntityId))
+    & ExpressionGui.stdWrapParentExpr "CaseEdit" pl (destCursorId alts (pl ^. Sugar.plEntityId))
     where
         myId = WidgetIds.fromExprPayload pl
         headerId = Widget.joinId myId ["header"]

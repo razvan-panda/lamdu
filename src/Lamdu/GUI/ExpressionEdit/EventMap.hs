@@ -39,21 +39,24 @@ data ExprInfo m = ExprInfo
     , exprInfoMinOpPrec :: MinOpPrec
     }
 
-exprInfoFromPl :: Sugar.Payload (T f) ExprGuiT.Payload -> ExprInfo f
-exprInfoFromPl pl =
+exprInfoFromPl :: String -> Sugar.Payload (T f) ExprGuiT.Payload -> ExprInfo f
+exprInfoFromPl msg pl =
     ExprInfo
     { exprInfoIsHoleResult = ExprGuiT.isHoleResult pl
     , exprInfoEntityId = pl ^. Sugar.plEntityId
     , exprInfoNearestHoles = pl ^. Sugar.plData . ExprGuiT.plNearestHoles
     , exprInfoActions = pl ^. Sugar.plActions
-    , exprInfoMinOpPrec = pl ^. Sugar.plData . ExprGuiT.plMinOpPrec
+    , exprInfoMinOpPrec =
+        traceId (msg ++ ": minOpPrec from payload: ") $
+        pl ^. Sugar.plData . ExprGuiT.plMinOpPrec
     }
 
 make ::
     (Monad m, Monad f) =>
+    String ->
     Sugar.Payload (T f) ExprGuiT.Payload -> ExprGuiM.HolePicker f ->
     ExprGuiM m (Widget.EventMap (T f Widget.EventResult))
-make = makeWith . exprInfoFromPl
+make msg = makeWith . exprInfoFromPl msg
 
 makeWith ::
     (Monad m, Monad f) =>
@@ -165,7 +168,7 @@ applyOperatorEventMap exprInfo holePicker =
         let acceptableOperatorChars
                 | isSelected = Chars.operator
                 | otherwise =
-                      filter ((>= exprInfoMinOpPrec exprInfo) . precedence) Chars.operator
+                      filter (\c -> ((>= traceId (show c ++ " has prec " ++ show (precedence c) ++ " vs. ") (exprInfoMinOpPrec exprInfo)) . precedence) c) Chars.operator
         let action wrap =
                 E.charGroup "Operator" doc acceptableOperatorChars $ \c ->
                     do

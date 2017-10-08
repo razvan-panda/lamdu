@@ -139,7 +139,7 @@ makeLabeled apply pl =
     makeFuncRow mParensId apply
     (pl ^. Sugar.plData . ExprGuiT.plNearestHoles) myId
     & addBox
-    & ExpressionGui.stdWrapParentExpr pl (pl ^. Sugar.plEntityId)
+    & ExpressionGui.stdWrapParentExpr ("ApplyEdit: " ++ show apply) pl (pl ^. Sugar.plEntityId)
     where
         addBox
             | isBoxed apply = mkBoxed apply (pl ^. Sugar.plData . ExprGuiT.plNearestHoles)
@@ -170,6 +170,7 @@ mkRelayedArgs nearestHoles args =
     where
         makeArgEdit arg =
             do
+                trace "mkRelayedArgs" $ return()
                 eventMap <-
                     ExprEventMap.makeWith ExprEventMap.ExprInfo
                     { exprInfoActions = arg ^. Sugar.raActions
@@ -209,13 +210,13 @@ makeSimple ::
     Sugar.Apply (ExprGuiT.SugarExpr m) ->
     Sugar.Payload (T m) ExprGuiT.Payload ->
     ExprGuiM m (ExpressionGui m)
-makeSimple (Sugar.Apply func arg) pl =
+makeSimple app@(Sugar.Apply func arg) pl =
     (ResponsiveExpr.boxSpacedMDisamb ?? mParensId)
     <*> sequenceA
     [ ExprGuiM.makeSubexpression func
     , ExprGuiM.makeSubexpression arg
     ]
-    & ExpressionGui.stdWrapParentExpr pl (func ^. Sugar.rPayload . Sugar.plEntityId)
+    & ExpressionGui.stdWrapParentExpr ("ApplyEdit " ++ show app) pl (func ^. Sugar.rPayload . Sugar.plEntityId)
     where
         mParensId
             | pl ^. Sugar.plData . ExprGuiT.plNeedParens = Just (Widget.toAnimId myId)

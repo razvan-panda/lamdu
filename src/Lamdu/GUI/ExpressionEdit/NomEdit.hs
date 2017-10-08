@@ -94,7 +94,7 @@ mkNomGui ordering nomStr str mDel valId pl (Sugar.Nominal tid val) =
               , val
               ] & sequence
             )
-    & ExpressionGui.stdWrapParentExpr pl valId
+    & ExpressionGui.stdWrapParentExpr "NomEdit" pl valId
     where
         mParenInfo
             | pl ^. Sugar.plData . ExprGuiT.plNeedParens =

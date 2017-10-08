@@ -28,7 +28,7 @@ minNamePrec = 2
 maxNamePrec :: Prec
 maxNamePrec = 12
 
-class HasPrecedence a where
+class Show a => HasPrecedence a where
     -- | Returns a precedence between minNamePrec..maxNamePrec
     precedence :: a -> Prec
 

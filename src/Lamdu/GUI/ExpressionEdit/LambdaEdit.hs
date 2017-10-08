@@ -142,7 +142,7 @@ make lam pl =
             <*> (Options.boxSpaced ?? Options.disambiguationNone ?? paramsAndLabelEdits
                 <&> (: [bodyEdit]))
             <&> E.weakerEvents eventMap
-    & ExpressionGui.stdWrapParentExpr pl bodyId
+    & ExpressionGui.stdWrapParentExpr "LambdaEdit" pl bodyId
     where
         animId = Widget.toAnimId myId
         mParensId

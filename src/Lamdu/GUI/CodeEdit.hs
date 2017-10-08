@@ -105,7 +105,7 @@ postProcessExpr ::
     Sugar.Expression (Name n) m ([Sugar.EntityId], NearestHoles) ->
     Sugar.Expression (Name n) m ExprGuiT.Payload
 postProcessExpr =
-    fmap toExprGuiMPayload . AddParens.add . AnnotationsPass.markAnnotationsToDisplay
+    traceId "CodeEdit.postprocessed to " . fmap toExprGuiMPayload . AddParens.add . AnnotationsPass.markAnnotationsToDisplay
 
 loadWorkArea ::
     Monad m =>

@@ -310,13 +310,13 @@ addDeletionDiagonal =
 
 stdWrap ::
     Monad m =>
-    Sugar.Payload (T m) ExprGuiT.Payload ->
+    String -> Sugar.Payload (T m) ExprGuiT.Payload ->
     ExprGuiM m (ExpressionGui m) ->
     ExprGuiM m (ExpressionGui m)
-stdWrap pl act =
+stdWrap msg pl act =
     do
         (res, holePicker) <- ExprGuiM.listenResultPicker act
-        exprEventMap <- ExprEventMap.make pl holePicker
+        exprEventMap <- ExprEventMap.make ("stdWrap of " ++ msg) pl holePicker
         maybeAddAnnotationPl pl ?? res
             <&> addEvents exprEventMap
     where
@@ -334,15 +334,16 @@ parentDelegator myId =
 
 stdWrapParentExpr ::
     Monad m =>
+    String ->
     Sugar.Payload (T m) ExprGuiT.Payload ->
     Sugar.EntityId ->
     ExprGuiM m (ExpressionGui m) ->
     ExprGuiM m (ExpressionGui m)
-stdWrapParentExpr pl delegateTo mkGui =
+stdWrapParentExpr msg pl delegateTo mkGui =
     mkGui
     & Widget.assignCursor (WidgetIds.fromExprPayload pl) (WidgetIds.fromEntityId delegateTo)
     & delegator
-    & stdWrap pl
+    & stdWrap msg pl
     where
         delegator
             | ExprGuiT.isHoleResult pl = id

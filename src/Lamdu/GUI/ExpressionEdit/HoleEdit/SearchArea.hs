@@ -86,9 +86,11 @@ makeStdWrapped hole pl widgetIds =
                 }
         closedSearchTermGui <-
             fdWrap <*> SearchTerm.make holeInfo <&> Responsive.fromWithTextPos
-            & ExpressionGui.stdWrap pl
+            & ExpressionGui.stdWrap "SearchArea search term" pl
         searchTermEventMap <- HoleEventMap.makeOpenEventMap holeInfo <&> fixEventMapCursor
-        exprEventMap <- ExprEventMap.make pl ExprGuiM.NoHolePick
+        exprEventMap <-
+            ExprEventMap.make ("SearchArea making event map with pl: " ++ show (pl ^. Sugar.plData . ExprGuiT.plMinOpPrec))
+            pl ExprGuiM.NoHolePick
         case (isActive, isAHoleInHole) of
             (True, False) ->
                 -- ideally the fdWrap would be "inside" the
