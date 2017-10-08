@@ -31,6 +31,7 @@ import qualified GUI.Momentu.Widgets.Grid as Grid
 import qualified GUI.Momentu.Widgets.Menu as Menu
 import qualified GUI.Momentu.Widgets.Spacer as Spacer
 import qualified Lamdu.CharClassification as Chars
+import           Lamdu.Config (Config)
 import qualified Lamdu.Config as Config
 import qualified Lamdu.Config.Theme as Theme
 import qualified Lamdu.GUI.ExpressionEdit.HoleEdit.EventMap as EventMap
@@ -182,24 +183,18 @@ afterPick holeInfo resultId mFirstHoleInside pr =
                 | otherwise -> "obliterated" : animId
 
 -- | Remove unwanted event handlers from a hole result
-removeUnwanted :: Monad m => Int -> ExprGuiM m (Widget.EventMap a -> Widget.EventMap a)
-removeUnwanted minOpPrec =
-    do
-        config <- Lens.view Config.config
-        let unwantedKeys =
-                concat
-                [ Config.delKeys config
-                , Grid.stdKeys ^.. traverse
-                , Config.letAddItemKeys config
-                ]
-                <&> MetaKey.toModKey
-        let disallowedOperator '.' = False
-            disallowedOperator char
-                | char `notElem` Chars.operator = False
-                | otherwise = precedence char < minOpPrec
-        return (E.filterChars (not . disallowedOperator) . deleteKeys unwantedKeys)
+removeUnwanted :: Config -> Widget.EventMap a -> Widget.EventMap a
+removeUnwanted config =
+    E.deleteKeys unwantedKeyEvents
     where
-        deleteKeys = E.deleteKeys . map (E.KeyEvent MetaKey.KeyState'Pressed)
+        unwantedKeyEvents =
+            concat
+            [ Config.delKeys config
+            , Grid.stdKeys ^.. traverse
+            , Config.letAddItemKeys config
+            ]
+            <&> MetaKey.toModKey
+            <&> E.KeyEvent MetaKey.KeyState'Pressed
 
 fixNumWithDotEventMap ::
     Monad m =>
@@ -242,8 +237,8 @@ makeHoleResultWidget ::
     )
 makeHoleResultWidget holeInfo resultId holeResult =
     do
-        remUnwanted <- removeUnwanted (hiMinOpPrec holeInfo)
-        holeConfig <- Lens.view Config.config <&> Config.hole
+        config <- Lens.view Config.config
+        let holeConfig = Config.hole config
         let pickAndMoveToNextHole =
                 Widget.keysEventMapMovesCursor (Config.holePickAndMoveToNextHoleKeys holeConfig)
                     (E.Doc ["Edit", "Result", "Pick and move to next hole"]) .
@@ -260,10 +255,10 @@ makeHoleResultWidget holeInfo resultId holeResult =
         isSelected <- Widget.isSubCursor ?? resultId
         when isSelected (ExprGuiM.setResultPicker (pickBefore (pure mempty)))
         holeResultConverted
-            & postProcessSugar
+            & postProcessSugar holeInfo
             & ExprGuiM.makeSubexpression
             <&> Widget.enterResultCursor .~ resultId
-            <&> E.eventMap %~ remUnwanted
+            <&> E.eventMap %~ removeUnwanted config
             <&> E.eventMap %~ mappend (fixNumWithDotEventMap holeInfo holeResult)
             <&> E.eventMap . E.emDocs . E.docStrs . Lens._last %~ (<> " (On picked result)")
             <&> E.eventMap . Lens.mapped %~ pickBefore
@@ -294,10 +289,10 @@ makeHoleResultWidget holeInfo resultId holeResult =
         simplePickRes keys =
             Widget.keysEventMap keys (E.Doc ["Edit", "Result", "Pick"]) (return ())
 
-postProcessSugar :: ExpressionN m () -> ExpressionN m ExprGuiT.Payload
-postProcessSugar expr =
+postProcessSugar :: HoleInfo f -> ExpressionN m () -> ExpressionN m ExprGuiT.Payload
+postProcessSugar info expr =
     expr
-    & AddParens.add
+    & AddParens.addWith (hiMinOpPrec info)
     <&> pl
     & SugarLens.holeArgs . Sugar.plData . ExprGuiT.plShowAnnotation
     .~ ExprGuiT.alwaysShowAnnotations
