@@ -106,18 +106,18 @@ convertRedex expr redex =
             & ConvertM.local (scScopeInfo . siLetItems <>~
                 Map.singleton param
                 (makeInline (expr ^. Val.payload . Input.stored) redex))
-        ann <- redex ^. Redex.arg . Val.payload & makeAnnotation
         return Let
             { _lEntityId = defEntityId
             , _lValue = value
             , _lActions = actions
             , _lName = UniqueId.toUUID param
             , _lAnnotation = ann
-            , _lBodyScope = redex ^. Redex.bodyScope
             , _lBody = letBody
+            , _lBodyScope = pure mempty
             , _lUsages = redex ^. Redex.paramRefs
             }
     where
+        ann = redex ^. Redex.arg . Val.payload & makeAnnotation
         binderKind =
             redex ^. Redex.lam
             <&> Lens.mapped %~ (^. Input.stored)
@@ -164,7 +164,7 @@ makeBinder chosenScopeProp params funcBody =
             , _bChosenScopeProp = chosenScopeProp ^. mkProperty
             , _bLamId = cpMLamParam params ^? Lens._Just . _1
             , _bBody = binderBody
-            , _bBodyScopes = cpScopes params
+            , _bBodyScopes = BinderBodyScope (pure mempty)
             , _bActions = BinderActions (_cpAddFirstParam params)
             }
     & ConvertM.local (ConvertM.scScopeInfo %~ addParams)

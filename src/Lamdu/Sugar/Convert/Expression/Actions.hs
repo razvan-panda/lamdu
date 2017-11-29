@@ -4,14 +4,12 @@ module Lamdu.Sugar.Convert.Expression.Actions
     ) where
 
 import qualified Control.Lens as Lens
-import qualified Data.Map as Map
 import qualified Data.Store.Property as Property
 import           Data.Store.Transaction (Transaction)
 import           Data.UUID.Types (UUID)
 import qualified Lamdu.Calc.Val as V
 import qualified Lamdu.Data.Definition as Definition
 import qualified Lamdu.Data.Ops as DataOps
-import qualified Lamdu.Eval.Results.Process as ResultsProcess
 import qualified Lamdu.Expr.IRef as ExprIRef
 import qualified Lamdu.Expr.UniqueId as UniqueId
 import qualified Lamdu.Infer as Infer
@@ -115,7 +113,6 @@ addActions ::
 addActions exprPl body =
     do
         actions <- mkActions exprPl
-        ann <- makeAnnotation exprPl
         protectedSetToVal <- ConvertM.typeProtectedSetToVal
         let setToExpr srcPl =
                 plActions . mReplaceParent .~
@@ -148,19 +145,12 @@ addActions exprPl body =
                     }
                 }
             }
-
-makeAnnotation :: Monad m => Input.Payload m a -> ConvertM m Annotation
-makeAnnotation payload =
-    do
-        ctx <- ConvertM.readContext
-        let mk res =
-                do
-                    Map.null res & not & guard
-                    res <&> ResultsProcess.addTypes (ctx ^. ConvertM.scNominalsMap) typ & Just
-        Annotation
-            { _aInferredType = typ
-            , _aMEvaluationResult =
-                payload ^. Input.evalResults <&> (^. Input.eResults) <&> mk
-            } & return
     where
-        typ = payload ^. Input.inferredType
+        ann = makeAnnotation exprPl
+
+makeAnnotation :: Input.Payload m a -> Annotation
+makeAnnotation payload =
+    Annotation
+    { _aInferredType = payload ^. Input.inferredType
+    , _aMEvaluationResult = pure Nothing
+    }

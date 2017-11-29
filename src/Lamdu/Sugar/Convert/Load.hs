@@ -11,8 +11,6 @@ module Lamdu.Sugar.Convert.Load
     , readValAndAddProperties
     ) where
 
-import qualified Control.Lens as Lens
-import           Data.CurAndPrev (CurAndPrev)
 import           Data.Store.Property (Property)
 import qualified Data.Store.Property as Property
 import           Data.Store.Transaction (Transaction)
@@ -20,7 +18,6 @@ import qualified Lamdu.Calc.Val as V
 import           Lamdu.Calc.Val.Annotated (Val)
 import qualified Lamdu.Calc.Val.Annotated as Val
 import qualified Lamdu.Data.Definition as Definition
-import           Lamdu.Eval.Results (EvalResults, erExprValues, erAppliesOfLam)
 import           Lamdu.Expr.IRef (ValI, ValIProperty)
 import qualified Lamdu.Expr.IRef as ExprIRef
 import           Lamdu.Infer (Infer)
@@ -62,10 +59,9 @@ propEntityId :: Property f (ValI m) -> EntityId
 propEntityId = EntityId.ofValI . Property.value
 
 preparePayloads ::
-    CurAndPrev (EvalResults (ValI m)) ->
     Val (Infer.Payload, ValIProperty m) ->
     Val (Input.Payload m ())
-preparePayloads evalRes inferredVal =
+preparePayloads inferredVal =
     inferredVal <&> f & Input.preparePayloads
     where
         f (inferPl, valIProp) =
@@ -76,25 +72,18 @@ preparePayloads evalRes inferredVal =
               , Input._entityId = eId
               , Input._stored = valIProp
               , Input._inferred = inferPl
-              , Input._evalResults = evalRes <&> exprEvalRes execId
               , Input._userData = ()
               }
             )
             where
                 eId = propEntityId valIProp
-                execId = Property.value valIProp
-        exprEvalRes pl r =
-            Input.EvalResultsForExpr
-            (r ^. erExprValues . Lens.at pl . Lens._Just)
-            (r ^. erAppliesOfLam . Lens.at pl . Lens._Just)
 
 loadInferPrepareInput ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) ->
     Val (Infer.Payload, ValIProperty m) ->
     InferT.M (T m) (Val (Input.Payload m [EntityId]))
-loadInferPrepareInput evalRes val =
-    preparePayloads evalRes val
+loadInferPrepareInput val =
+    preparePayloads val
     <&> setUserData
     & ParamList.loadForLambdas
     where
@@ -111,14 +100,13 @@ readValAndAddProperties prop =
 
 inferDef ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) ->
     Definition.Expr (Val (ValIProperty m)) ->
     V.Var ->
     T m (Either Infer.Error (Val (Input.Payload m [EntityId]), Infer.Context))
-inferDef results defExpr defVar =
+inferDef defExpr defVar =
     inferRecursive defExpr defVar
     & InferT.liftInfer
-    >>= loadInferPrepareInput results
+    >>= loadInferPrepareInput
     & InferT.run
 
 inferCheckDef ::

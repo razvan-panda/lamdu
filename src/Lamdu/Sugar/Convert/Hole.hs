@@ -17,7 +17,6 @@ import           Control.Monad.ListT (ListT)
 import           Control.Monad.Trans.Either (EitherT(..))
 import           Control.Monad.Trans.State (StateT(..), mapStateT)
 import qualified Control.Monad.Trans.State as State
-import           Data.CurAndPrev (CurAndPrev(..))
 import           Data.Functor.Identity (Identity(..))
 import qualified Data.List.Class as ListClass
 import qualified Data.Map as Map
@@ -320,8 +319,6 @@ prepareUnstoredPayloads val =
               , Input._inferred = inferPl
               , Input._entityId = eId
               , Input._stored = error "TODO: Nothing stored?!"
-              , Input._evalResults =
-                CurAndPrev Input.emptyEvalResults Input.emptyEvalResults
               }
             )
 
@@ -481,7 +478,6 @@ writeConvertTypeChecked holeEntityId sugarContext holeStored inferredVal =
                   { Input._varRefsOfLambda = varRefs
                   , Input._userData = a
                   , Input._inferred = inferred
-                  , Input._evalResults = CurAndPrev noEval noEval
                   , Input._stored = stored
                   , Input._entityId = eId
                   }
@@ -490,7 +486,6 @@ writeConvertTypeChecked holeEntityId sugarContext holeStored inferredVal =
             )
             where
                 eId = Property.value stored & EntityId.ofValI
-        noEval = Input.EvalResultsForExpr Map.empty Map.empty
 
 idTranslations ::
     Val (EntityId, Type) ->

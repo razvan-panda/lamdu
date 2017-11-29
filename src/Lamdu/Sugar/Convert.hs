@@ -6,7 +6,6 @@ module Lamdu.Sugar.Convert
 import           Control.Applicative ((<|>))
 import qualified Control.Lens as Lens
 import qualified Control.Monad.Trans.State as State
-import           Data.CurAndPrev (CurAndPrev)
 import qualified Data.List as List
 import           Data.List.Utils (insertAt, removeAt)
 import qualified Data.Map as Map
@@ -22,7 +21,6 @@ import           Lamdu.Calc.Type.Scheme (Scheme, schemeType)
 import           Lamdu.Calc.Val.Annotated (Val(..))
 import qualified Lamdu.Data.Anchors as Anchors
 import qualified Lamdu.Data.Definition as Definition
-import           Lamdu.Eval.Results (EvalResults)
 import           Lamdu.Expr.IRef (DefI, ValI, ValIProperty)
 import qualified Lamdu.Expr.IRef as ExprIRef
 import qualified Lamdu.Expr.Lens as ExprLens
@@ -97,13 +95,13 @@ nonRepeating = concat . filter (null . tail) . List.group . List.sort
 
 convertInferDefExpr ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m ->
+    Anchors.CodeAnchors m ->
     Scheme -> Definition.Expr (Val (ValIProperty m)) -> DefI m ->
     T m (DefinitionBody UUID (T m) (ExpressionU m [EntityId]))
-convertInferDefExpr evalRes cp defType defExpr defI =
+convertInferDefExpr cp defType defExpr defI =
     do
         (valInferred, newInferContext) <-
-            Load.inferDef evalRes defExpr defVar <&> Load.assertInferSuccess
+            Load.inferDef defExpr defVar <&> Load.assertInferSuccess
         nomsMap <- makeNominalsMap valInferred
         outdatedDefinitions <-
             OutdatedDefs.scan defExpr setDefExpr (postProcessDef defI)
@@ -144,26 +142,26 @@ convertInferDefExpr evalRes cp defType defExpr defI =
 
 convertDefBody ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m ->
+    Anchors.CodeAnchors m ->
     Definition.Definition (Val (ValIProperty m)) (DefI m) ->
     T m (DefinitionBody UUID (T m) (ExpressionU m [EntityId]))
-convertDefBody evalRes cp (Definition.Definition body defType defI) =
+convertDefBody cp (Definition.Definition body defType defI) =
     case body of
-    Definition.BodyExpr defExpr -> convertInferDefExpr evalRes cp defType defExpr defI
+    Definition.BodyExpr defExpr -> convertInferDefExpr cp defType defExpr defI
     Definition.BodyBuiltin builtin -> convertDefIBuiltin defType builtin defI & return
 
 convertExpr ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m ->
+    Anchors.CodeAnchors m ->
     Transaction.MkProperty m (Definition.Expr (ValI m)) ->
     T m (ExpressionU m [EntityId])
-convertExpr evalRes cp prop =
+convertExpr cp prop =
     do
         defExpr <- ExprLoad.defExprProperty prop
         (valInferred, newInferContext) <-
             Load.inferDefExpr Infer.emptyScope defExpr
             & InferT.liftInfer
-            >>= Load.loadInferPrepareInput evalRes
+            >>= Load.loadInferPrepareInput
             & InferT.run
             <&> Load.assertInferSuccess
         nomsMap <- makeNominalsMap valInferred
@@ -190,10 +188,10 @@ convertExpr evalRes cp prop =
 
 loadRepl ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m ->
+    Anchors.CodeAnchors m ->
     T m (Expression UUID (T m) [EntityId])
-loadRepl evalRes cp =
-    convertExpr evalRes cp (Anchors.repl cp)
+loadRepl cp =
+    convertExpr cp (Anchors.repl cp)
     <&> Lens.mapped %~ (^. pUserData)
     >>= PresentationModes.addToExpr
     >>= OrderTags.orderExpr
@@ -207,9 +205,9 @@ loadAnnotatedDef getDefI annotation =
 
 loadPanes ::
     Monad m =>
-    CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m -> EntityId ->
+    Anchors.CodeAnchors m -> EntityId ->
     T m [Pane UUID (T m) [EntityId]]
-loadPanes evalRes cp replEntityId =
+loadPanes cp replEntityId =
     do
         Property panes setPanes <- Anchors.panes cp ^. Transaction.mkProperty
         paneDefs <- mapM (loadAnnotatedDef Anchors.paneDef) panes
@@ -239,7 +237,7 @@ loadPanes evalRes cp replEntityId =
                     bodyS <-
                         def
                         <&> Anchors.paneDef
-                        & convertDefBody evalRes cp
+                        & convertDefBody cp
                         <&> Lens.mapped . Lens.mapped %~ (^. pUserData)
                     let defI = def ^. Definition.defPayload & Anchors.paneDef
                     defS <-
@@ -261,10 +259,9 @@ loadPanes evalRes cp replEntityId =
         paneDefs & Lens.itraversed %%@~ convertPane
 
 loadWorkArea ::
-    Monad m => CurAndPrev (EvalResults (ValI m)) -> Anchors.CodeAnchors m ->
-    T m (WorkArea UUID (T m) [EntityId])
-loadWorkArea evalRes cp =
+    Monad m => Anchors.CodeAnchors m -> T m (WorkArea UUID (T m) [EntityId])
+loadWorkArea cp =
     do
-        repl <- loadRepl evalRes cp
-        panes <- loadPanes evalRes cp (repl ^. rPayload . plEntityId)
+        repl <- loadRepl cp
+        panes <- loadPanes cp (repl ^. rPayload . plEntityId)
         WorkArea panes repl & return

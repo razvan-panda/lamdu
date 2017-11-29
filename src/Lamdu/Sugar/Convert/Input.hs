@@ -2,14 +2,13 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards, DeriveTraversable, TemplateHaskell #-}
 module Lamdu.Sugar.Convert.Input
     ( Payload(..)
-        , varRefsOfLambda, entityId, inferred, stored, evalResults, userData
+        , varRefsOfLambda, entityId, inferred, stored, userData
     , EvalResultsForExpr(..), eResults, eAppliesOfLam, emptyEvalResults
     , inferredType, inferredScope
     , preparePayloads
     ) where
 
 import qualified Control.Lens as Lens
-import           Data.CurAndPrev (CurAndPrev(..))
 import qualified Data.Map as Map
 import           Lamdu.Calc.Type (Type)
 import qualified Lamdu.Calc.Val as V
@@ -30,7 +29,6 @@ data Payload m a = Payload
     { _entityId :: EntityId
     , _inferred :: Infer.Payload
     , _stored :: ValIProperty m
-    , _evalResults :: CurAndPrev EvalResultsForExpr
     , -- The GetVars of this lambda's var if this is a lambda
       _varRefsOfLambda :: [EntityId]
     , _userData :: a

@@ -12,7 +12,6 @@ module Lamdu.Sugar.Convert.Binder.Params
 
 import qualified Control.Lens as Lens
 import           Control.Monad.Transaction (transaction)
-import           Data.CurAndPrev (CurAndPrev)
 import qualified Data.List as List
 import qualified Data.List.Utils as ListUtils
 import qualified Data.Map as Map
@@ -31,8 +30,6 @@ import qualified Lamdu.Calc.Val.Annotated as Val
 import qualified Lamdu.Data.Anchors as Anchors
 import qualified Lamdu.Data.Ops as DataOps
 import qualified Lamdu.Data.Ops.Subexprs as SubExprs
-import qualified Lamdu.Eval.Results as ER
-import qualified Lamdu.Eval.Results.Process as ResultsProcess
 import qualified Lamdu.Expr.GenIds as GenIds
 import           Lamdu.Expr.IRef (ValI, ValIProperty)
 import qualified Lamdu.Expr.IRef as ExprIRef
@@ -58,7 +55,6 @@ data ConventionalParams m = ConventionalParams
     , _cpParamInfos :: Map T.Tag ConvertM.TagFieldParam
     , _cpParams :: BinderParams UUID (T m)
     , _cpAddFirstParam :: T m ParamAddResult
-    , cpScopes :: BinderBodyScope
     , cpMLamParam :: Maybe ({- lambda's -}EntityId, V.Var)
     }
 Lens.makeLenses ''ConventionalParams
@@ -66,7 +62,6 @@ Lens.makeLenses ''ConventionalParams
 data FieldParam = FieldParam
     { fpTag :: T.Tag
     , fpFieldType :: Type
-    , fpValue :: CurAndPrev (Map ER.ScopeId [(ER.ScopeId, ER.Val Type)])
     }
 
 data StoredLam m = StoredLam
@@ -176,11 +171,6 @@ addFieldParam mPresMode mkArg binderKind mkNewTags storedLam =
                         & V.BRecExtend & ExprIRef.newValBody
         fixUsagesOfLamBinder addFieldToCall binderKind storedLam
         return tagS
-
-mkCpScopesOfLam :: Input.Payload m a -> CurAndPrev (Map ER.ScopeId [BinderParamScopeId])
-mkCpScopesOfLam x =
-    x ^. Input.evalResults <&> (^. Input.eAppliesOfLam) <&> (fmap . fmap) fst
-    <&> (fmap . map) BinderParamScopeId
 
 getFieldOnVar :: Lens.Traversal' (Val t) (V.Var, T.Tag)
 getFieldOnVar = Val.body . V._BGetField . inGetField
@@ -360,7 +350,6 @@ convertRecordParams mPresMode binderKind fieldParams lam@(V.Lam param _) pl =
     , _cpAddFirstParam =
         addFieldParam mPresMode DataOps.newHole binderKind (:tags) storedLam
         <&> ParamAddResultNewTag
-    , cpScopes = BinderBodyScope $ mkCpScopesOfLam pl
     , cpMLamParam = Just (pl ^. Input.entityId, param)
     }
     where
@@ -381,13 +370,7 @@ convertRecordParams mPresMode binderKind fieldParams lam@(V.Lam param _) pl =
             , _fpAnnotation =
                 Annotation
                 { _aInferredType = fpFieldType fp
-                , _aMEvaluationResult =
-                    fpValue fp <&>
-                    \x ->
-                    do
-                        Map.null x & not & guard
-                        x ^.. Lens.traversed . Lens.traversed
-                            & Map.fromList & Just
+                , _aMEvaluationResult = pure mempty
                 }
             }
             where
@@ -506,27 +489,16 @@ makeNonRecordParamActions binderKind storedLam =
     , _fpMOrderAfter = Nothing
     }
 
-mkFuncParam :: Monad m => Input.Payload m a -> info -> ConvertM m (FuncParam info)
+mkFuncParam :: Input.Payload m a -> info -> FuncParam info
 mkFuncParam lamExprPl info =
-    do
-        noms <- ConvertM.readContext <&> (^. ConvertM.scNominalsMap)
-        return FuncParam
-            { _fpInfo = info
-            , _fpAnnotation =
-                Annotation
-                { _aInferredType = typ
-                , _aMEvaluationResult =
-                    lamExprPl ^. Input.evalResults
-                    <&> (^. Input.eAppliesOfLam)
-                    <&> \lamApplies ->
-                    do
-                        Map.null lamApplies & not & guard
-                        lamApplies ^..
-                            Lens.traversed . Lens.traversed & Map.fromList
-                            <&> ResultsProcess.addTypes noms typ
-                            & Just
-                }
-            }
+    FuncParam
+    { _fpInfo = info
+    , _fpAnnotation =
+        Annotation
+        { _aInferredType = typ
+        , _aMEvaluationResult = pure mempty
+        }
+    }
     where
         typ = lamParamType lamExprPl
 
@@ -537,22 +509,22 @@ convertNonRecordParam ::
 convertNonRecordParam binderKind lam@(V.Lam param _) lamExprPl =
     do
         funcParamActions <- makeNonRecordParamActions binderKind storedLam
-        funcParam <-
-            case lamParamType lamExprPl of
-            T.TRecord T.CEmpty
-                | null (lamExprPl ^. Input.varRefsOfLambda) ->
-                  funcParamActions ^. fpDelete
-                  & void
-                  & NullParamActions
-                  & mkFuncParam lamExprPl
-                  <&> NullParam
-            _ ->
-                VarParamInfo
-                { _vpiName = UniqueId.toUUID param
-                , _vpiActions = funcParamActions
-                , _vpiId = paramEntityId
-                } & mkFuncParam lamExprPl
-                <&> VarParam
+        let funcParam =
+                case lamParamType lamExprPl of
+                T.TRecord T.CEmpty
+                    | null (lamExprPl ^. Input.varRefsOfLambda) ->
+                    funcParamActions ^. fpDelete
+                    & void
+                    & NullParamActions
+                    & mkFuncParam lamExprPl
+                    & NullParam
+                _ ->
+                    VarParamInfo
+                    { _vpiName = UniqueId.toUUID param
+                    , _vpiActions = funcParamActions
+                    , _vpiId = paramEntityId
+                    } & mkFuncParam lamExprPl
+                    & VarParam
         pure ConventionalParams
             { cpTags = mempty
             , _cpParamInfos = Map.empty
@@ -561,7 +533,6 @@ convertNonRecordParam binderKind lam@(V.Lam param _) lamExprPl =
                 convertToRecordParams DataOps.newHole
                 binderKind storedLam NewParamBefore
                 <&> ParamAddResultVarToTags
-            , cpScopes = BinderBodyScope $ mkCpScopesOfLam lamExprPl
             , cpMLamParam = Just (lamExprPl ^. Input.entityId, param)
             }
     where
@@ -616,19 +587,10 @@ convertNonEmptyParams mPresMode binderKind lambda lambdaPl =
         let tagsInOuterScope =
                 ctx ^. ConvertM.scScopeInfo . ConvertM.siTagParamInfos
                 & Map.keysSet
-        let noms = ctx ^. ConvertM.scNominalsMap
         let makeFieldParam (tag, typeExpr) =
                 FieldParam
                 { fpTag = tag
                 , fpFieldType = typeExpr
-                , fpValue =
-                        lambdaPl ^. Input.evalResults
-                        <&> (^. Input.eAppliesOfLam)
-                        <&> Lens.traversed . Lens.mapped . _2 %~
-                            ResultsProcess.addTypes noms typeExpr .
-                            ER.extractField tag
-                        <&> Lens.traversed %~
-                            filter (Lens.nullOf (_2 . ER.body . ER._RError))
                 }
         orderedType <-
             lambdaPl ^. Input.inferredType & orderType & transaction
@@ -705,7 +667,6 @@ convertEmptyParams binderKind val =
         val <&> (^. Input.stored)
         & convertBinderToFunction DataOps.newHole binderKind
         <&> fst
-    , cpScopes = SameAsParentScope
     , cpMLamParam = Nothing
     }
 

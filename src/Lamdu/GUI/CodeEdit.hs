@@ -113,8 +113,8 @@ loadWorkArea ::
     CurAndPrev (EvalResults (ValI m)) ->
     Anchors.CodeAnchors m ->
     T m (Sugar.WorkArea (Name (T m)) (T m) ExprGuiT.Payload)
-loadWorkArea theEvalResults theCodeAnchors =
-    SugarConvert.loadWorkArea theEvalResults theCodeAnchors
+loadWorkArea _theEvalResults theCodeAnchors =
+    SugarConvert.loadWorkArea theCodeAnchors
     >>= AddNames.addToWorkArea
     <&>
     \Sugar.WorkArea { _waPanes, _waRepl } ->
