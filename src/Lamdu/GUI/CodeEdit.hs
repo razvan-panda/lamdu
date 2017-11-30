@@ -50,6 +50,7 @@ import qualified Lamdu.GUI.WidgetIds as WidgetIds
 import           Lamdu.Name (Name)
 import           Lamdu.Style (HasStyle)
 import qualified Lamdu.Sugar.Convert as SugarConvert
+import qualified Lamdu.Sugar.EvalResults as AddEvalResults
 import qualified Lamdu.Sugar.Lens as SugarLens
 import qualified Lamdu.Sugar.Names.Add as AddNames
 import           Lamdu.Sugar.NearestHoles (NearestHoles)
@@ -113,9 +114,10 @@ loadWorkArea ::
     CurAndPrev (EvalResults (ValI m)) ->
     Anchors.CodeAnchors m ->
     T m (Sugar.WorkArea (Name (T m)) (T m) ExprGuiT.Payload)
-loadWorkArea _theEvalResults theCodeAnchors =
+loadWorkArea theEvalResults theCodeAnchors =
     SugarConvert.loadWorkArea theCodeAnchors
     >>= AddNames.addToWorkArea
+    <&> AddEvalResults.addToWorkArea theEvalResults
     <&>
     \Sugar.WorkArea { _waPanes, _waRepl } ->
     Sugar.WorkArea

@@ -267,6 +267,7 @@ Executable lamdu
                   , Lamdu.Sugar.Convert.Tag
                   , Lamdu.Sugar.Convert.Text
                   , Lamdu.Sugar.EntityId
+                  , Lamdu.Sugar.EvalResults
                   , Lamdu.Sugar.Internal
                   , Lamdu.Sugar.Internal.EntityId
                   , Lamdu.Sugar.Parens
